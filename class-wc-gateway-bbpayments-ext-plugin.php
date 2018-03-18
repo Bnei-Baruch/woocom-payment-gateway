@@ -245,11 +245,11 @@ function wc_bb_payments_gateway_load()
                 'CancelURL' => $order->get_cancel_order_url(),
 
                 'Name' => $order->shipping_first_name . ' ' . $order->shipping_last_name,
-                'Amount' => number_format($order->get_total(), 2, '.', ''),
+                'Price' => number_format($order->get_total(), 2, '.', ''),
                 'Currency' => get_woocommerce_currency(), // TODO: to translate?
                 'Email' => $order->billing_email,
                 'Phone' => '',
-                'Address' => '',
+                'Street' => '',
                 'City' => $order->shipping_city,
                 'Country' => $order->shipping_country,
                 'Participants' => 1,
@@ -275,7 +275,7 @@ function wc_bb_payments_gateway_load()
                 }
             }
 
-            $args['Event'] = implode(', ', $item_names);
+            $args['Details'] = implode(', ', $item_names);
             echo "<pre>";
             var_dump($args);
             echo "</pre>";
