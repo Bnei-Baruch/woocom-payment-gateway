@@ -227,11 +227,11 @@ function wc_bb_payments_gateway_load()
         function get_payment_args($order)
         {
             echo "<pre>";
-            var_dump($order . get_data());
+            var_dump($order.get_data());
             echo "</pre>";
             exit();
 
-            $order_key = $order->get_order_key();
+            $order_key = $order->order_key;
             $order_id = $order->get_order_number();
 
             $this->log_message('Generating payment form for order ' . $order_id . '. Notify URL: ' . $this->notify_url);
@@ -253,11 +253,11 @@ function wc_bb_payments_gateway_load()
                 'Name' => $order->get_formatted_billing_full_name(),
                 'Price' => number_format($order->get_total(), 2, '.', ''),
                 'Currency' => get_woocommerce_currency(), // TODO: to translate?
-                'Email' => $order->get_billing_email(),
-                'Phone' => $order->get_billing_phone(),
+                'Email' => $order->email,
+                'Phone' => $order->phone,
                 'Street' => $order->get_formatted_billing_address(),
-                'City' => $order->get_billing_city(),
-                'Country' => $order->get_billing_country(),
+                'City' => $order->city,
+                'Country' => $order->country,
                 'Participants' => 1,
                 'SKU' => $this->sku,
                 'VAT' => 'N',
