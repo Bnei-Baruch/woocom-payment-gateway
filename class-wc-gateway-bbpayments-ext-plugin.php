@@ -280,11 +280,10 @@ function wc_bb_payments_gateway_load()
 
             $args = apply_filters('woocommerce_bb_payments_args', $args);
 
-            echo "<pre>";
-            var_dump($this);
-            echo "</pre>";
-            exit();
-
+            // echo "<pre>";
+            // var_dump($this);
+            // echo "</pre>";
+            // exit();
 
             return $args;
         }
