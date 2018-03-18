@@ -197,7 +197,7 @@ function wc_bb_payments_gateway_load()
                     'default' => 'no'),
                 'SKU' => array(
                     'title' => __('Priority SKU', 'woocommerce'),
-                    'type' => 'checkbox',
+                    'type' => 'text',
                     'label' => __('stockkeeping unit.', 'woocommerce'),
                     'description' => __('Identification for a product', 'woocommerce'),
                     'default' => 'no'),
