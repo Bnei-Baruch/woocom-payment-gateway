@@ -254,7 +254,7 @@ function wc_bb_payments_gateway_load()
                 'City' => $order->city,
                 'Country' => $order->country,
                 'Participants' => 1,
-                'SKU' => $this->sku,
+                'SKU' => $this->settings["SKU"],
                 'VAT' => 'N',
                 'Installments' => 3,
                 'Language' => $language,
