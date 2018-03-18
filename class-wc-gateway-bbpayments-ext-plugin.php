@@ -226,11 +226,6 @@ function wc_bb_payments_gateway_load()
          */
         function get_payment_args($order)
         {
-            echo "<pre>";
-            var_dump($order.get_data());
-            echo "</pre>";
-            exit();
-
             $order_key = $order->order_key;
             $order_id = $order->get_order_number();
 
@@ -284,6 +279,12 @@ function wc_bb_payments_gateway_load()
             $args['Details'] = implode(', ', $item_names);
 
             $args = apply_filters('woocommerce_bb_payments_args', $args);
+
+            echo "<pre>";
+            var_dump($this);
+            echo "</pre>";
+            exit();
+
 
             return $args;
         }
