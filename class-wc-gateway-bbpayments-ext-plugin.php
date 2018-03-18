@@ -226,9 +226,15 @@ function wc_bb_payments_gateway_load()
          */
         function get_payment_args($order)
         {
-            $order_key = $order->order_key;
+            echo "<pre>";
+            var_dump($order . get_data());
+            echo "</pre>";
+            exit();
 
-            $this->log_message('Generating payment form for order ' . $order->id . '. Notify URL: ' . $this->notify_url);
+            $order_key = $order->get_order_key();
+            $order_id = $order->get_order_number();
+
+            $this->log_message('Generating payment form for order ' . $order_id . '. Notify URL: ' . $this->notify_url);
 
             if (ICL_LANGUAGE_CODE == 'he') {
                 $language = 'HE';
@@ -244,20 +250,20 @@ function wc_bb_payments_gateway_load()
                 'ErrorURL' => $order->get_cancel_order_url(),
                 'CancelURL' => $order->get_cancel_order_url(),
 
-                'Name' => $order->shipping_first_name . ' ' . $order->shipping_last_name,
+                'Name' => $order->get_formatted_billing_full_name(),
                 'Price' => number_format($order->get_total(), 2, '.', ''),
                 'Currency' => get_woocommerce_currency(), // TODO: to translate?
-                'Email' => $order->billing_email,
-                'Phone' => '',
-                'Street' => '',
-                'City' => $order->shipping_city,
-                'Country' => $order->shipping_country,
+                'Email' => $order->get_billing_email(),
+                'Phone' => $order->get_billing_phone(),
+                'Street' => $order->get_formatted_billing_address(),
+                'City' => $order->get_billing_city(),
+                'Country' => $order->get_billing_country(),
                 'Participants' => 1,
                 'SKU' => $this->sku,
                 'VAT' => 'N',
                 'Installments' => 3,
                 'Language' => $language,
-                'Reference' => '66b-' . $order_key,
+                'Reference' => '66b-' . $order_id,
                 'Organization' => 'ben2',
 
                 // TODO: IPN
@@ -276,10 +282,6 @@ function wc_bb_payments_gateway_load()
             }
 
             $args['Details'] = implode(', ', $item_names);
-            echo "<pre>";
-            var_dump($args);
-            echo "</pre>";
-            exit();
 
             $args = apply_filters('woocommerce_bb_payments_args', $args);
 
@@ -337,9 +339,9 @@ function wc_bb_payments_gateway_load()
 			');
 
             return '<form action="' . esc_url($addr) . '" method="post" id="bb_payments_payment_form" target="_top">' .
-			implode('', $args_array) .
-			'<input type="submit" class="button alt" id="submit_bb_payments_payment_form" value="' . __('Pay via BB Payments', 'woocommerce') . '" /> <a class="button cancel" href="' . esc_url($order->get_cancel_order_url()) . '">' . __('Cancel order &amp; restore cart', 'woocommerce') . '</a>' .
-		    '</form>';
+                implode('', $args_array) .
+                '<input type="submit" class="button alt" id="submit_bb_payments_payment_form" value="' . __('Pay via BB Payments', 'woocommerce') . '" /> <a class="button cancel" href="' . esc_url($order->get_cancel_order_url()) . '">' . __('Cancel order &amp; restore cart', 'woocommerce') . '</a>' .
+                '</form>';
         }
 
         /**
