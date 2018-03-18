@@ -66,8 +66,6 @@ function wc_bb_payments_gateway_load()
          */
         public function __construct()
         {
-            global $woocommerce;
-
             $this->id = 'bb_payments';
             $this->icon = plugins_url('images/bb_payments.png', __FILE__);
             $this->has_fields = false;
@@ -82,12 +80,11 @@ function wc_bb_payments_gateway_load()
             // Required:
             $this->liveurl = $this->get_option('liveurl');
             $this->confirm_url = $this->get_option('confirm_url');
-            $this->access_token = $this->get_option('access_token');
-            $this->app_secret = $this->get_option('app_secret');
             // Optional:
             $this->title = $this->get_option('title');
             $this->description = $this->get_option('description');
             $this->testmode = $this->get_option('testmode');
+            $this->sku = $this->get_option('sku');
             $this->debug = true; //$this->get_option('debug');
             $this->form_submission_method = $this->get_option('form_submission_method') == 'yes' ? true : false;
             $this->notify_url = str_replace('https:', 'http:', add_query_arg('wc-api', 'WC_Gateway_BB_Payments', home_url('/')));
@@ -98,12 +95,6 @@ function wc_bb_payments_gateway_load()
             }
             if (empty($this->confirm_url)) {
                 add_action('admin_notices', array($this, 'confirm_url_missing_message'));
-            }
-            if (empty($this->access_token)) {
-                add_action('admin_notices', array($this, 'access_token_missing_message'));
-            }
-            if (empty($this->app_secret)) {
-                add_action('admin_notices', array($this, 'app_secret_missing_message'));
             }
 
             // Logs
@@ -119,7 +110,7 @@ function wc_bb_payments_gateway_load()
 
             add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
 
-            $this->enabled = (('yes' == $this->get_option('enabled')) && !empty($this->access_token) && !empty($this->app_secret) && $this->is_valid_for_use()) ? 'yes' : 'no';
+            $this->enabled = (('yes' == $this->get_option('enabled')) && $this->is_valid_for_use()) ? 'yes' : 'no';
         }
 
         /**
@@ -139,7 +130,8 @@ function wc_bb_payments_gateway_load()
          *
          * @since 1.0.0
          */
-        public function admin_options(){
+        public function admin_options()
+        {
             ?>
             <h3><?php _e('BB Payments', 'woocommerce'); ?></h3>
             <p><?php _e('BB Payments works by sending the user to BB Payments to enter their payment information.', 'woocommerce'); ?></p>
@@ -187,16 +179,6 @@ function wc_bb_payments_gateway_load()
                     'description' => __('This controls the description which the user sees during checkout.', 'woocommerce'),
                     'default' => __('Pay via BB Payments', 'woocommerce'),
                     'desc_tip' => true),
-                'access_token' => array(
-                    'title' => __('Application Access Token', 'wcbb_payments'),
-                    'type' => 'text',
-                    'description' => __('Please enter your BB Payments Access Token.', 'wcbb_payments'),
-                    'default' => ''),
-                'app_secret' => array(
-                    'title' => __('Application Secret', 'wc_bb_payments'),
-                    'type' => 'textarea',
-                    'description' => __('Please enter your BB Payments Application Secret.', 'wcbb_payments'),
-                    'default' => ''),
                 'confirm_url' => array(
                     'title' => __('Confirmation URL', 'wc_bb_payments'),
                     'type' => 'text',
@@ -212,6 +194,12 @@ function wc_bb_payments_gateway_load()
                     'type' => 'checkbox',
                     'label' => __('Use form submission method.', 'woocommerce'),
                     'description' => __('Enable this to post order data to BB Payments via a form instead of using a redirect/querystring.', 'woocommerce'),
+                    'default' => 'no'),
+                'SKU' => array(
+                    'title' => __('Priority SKU', 'woocommerce'),
+                    'type' => 'checkbox',
+                    'label' => __('stockkeeping unit.', 'woocommerce'),
+                    'description' => __('Identification for a product', 'woocommerce'),
                     'default' => 'no'),
                 'testmode' => array(
                     'title' => __('Test Mode', 'woocommerce'),
@@ -238,50 +226,62 @@ function wc_bb_payments_gateway_load()
          */
         function get_payment_args($order)
         {
-            $order_id = $order->id;
+            $order_key = $order->order_key;
 
             $this->log_message('Generating payment form for order ' . $order->id . '. Notify URL: ' . $this->notify_url);
 
+            if (ICL_LANGUAGE_CODE == 'he') {
+                $language = 'HE';
+            } else if (ICL_LANGUAGE_CODE == 'ru') {
+                $language = 'RU';
+            } else {
+                $language = 'EN';
+            }
             $args = array(
-                'access_token' => $this->access_token,
+                'UserKey' => $order_key,
 
-                'currency' => get_woocommerce_currency(),
-                'return' => $this->get_return_url($order),
-                'cancel_return' => $order->get_cancel_order_url(),
+                'GoodURL' => $this->get_return_url($order),
+                'ErrorURL' => $order->get_cancel_order_url(),
+                'CancelURL' => $order->get_cancel_order_url(),
 
-                // Order key + ID
-                'invoiceID' => $order->id,
-                'custom1' => serialize(array($order_id, $order->order_key)),
+                'Name' => $order->shipping_first_name . ' ' . $order->shipping_last_name,
+                'Amount' => number_format($order->get_total(), 2, '.', ''),
+                'Currency' => get_woocommerce_currency(), // TODO: to translate?
+                'Email' => $order->billing_email,
+                'Phone' => '',
+                'Address' => '',
+                'City' => $order->shipping_city,
+                'Country' => $order->shipping_country,
+                'Participants' => 1,
+                'SKU' => $this->sku,
+                'VAT' => 'N',
+                'Installments' => 3,
+                'Language' => $language,
+                'Reference' => '66b-' . $order_key,
+                'Organization' => 'ben2',
 
-                // IPN
-                'notify_url' => $this->notify_url,
+                // TODO: IPN
+                // 'notify_url' => $this->notify_url,
 
-                // Billing Address info
-                'first_name' => $order->shipping_first_name,
-                'last_name' => $order->shipping_last_name,
-                'email' => $order->billing_email,
-                'country' => $order->shipping_country,
-                'city' => $order->shipping_city,
-                'zip' => $order->shipping_postcode,
-
-                'language' => ICL_LANGUAGE_CODE,
-
-                'installments' => 3,
-                'amount' => number_format($order->get_total(), 2, '.', '')
             );
 
             $item_names = array();
             $items = $order->get_items();
-            if (sizeof($items) > 0)
-                foreach ($items as $item)
-                    if ($item['qty'])
+            if (sizeof($items) > 0) {
+                foreach ($items as $item) {
+                    if ($item['qty']) {
                         $item_names[] = '"' . $item['name'] . '" x ' . $item['qty'];
+                    }
+                }
+            }
 
-            $args['item_name'] = sprintf(__('Order %s', 'woocommerce'), $order->get_order_number());
-            $args['amount_level'] = implode(', ', $item_names);
+            $args['Event'] = implode(', ', $item_names);
+            echo "<pre>";
+            var_dump($args);
+            echo "</pre>";
+            exit();
 
             $args = apply_filters('woocommerce_bb_payments_args', $args);
-
 
             return $args;
         }
@@ -336,10 +336,10 @@ function wc_bb_payments_gateway_load()
 				jQuery("#submit_bb_payments_payment_form").click();
 			');
 
-            return '<form action="' . esc_url($addr) . '" method="post" id="bb_payments_payment_form" target="_top">
-			' . implode('', $args_array) . '
-			<input type="submit" class="button alt" id="submit_bb_payments_payment_form" value="' . __('Pay via BB Payments', 'woocommerce') . '" /> <a class="button cancel" href="' . esc_url($order->get_cancel_order_url()) . '">' . __('Cancel order &amp; restore cart', 'woocommerce') . '</a>
-		    </form>';
+            return '<form action="' . esc_url($addr) . '" method="post" id="bb_payments_payment_form" target="_top">' .
+			implode('', $args_array) .
+			'<input type="submit" class="button alt" id="submit_bb_payments_payment_form" value="' . __('Pay via BB Payments', 'woocommerce') . '" /> <a class="button cancel" href="' . esc_url($order->get_cancel_order_url()) . '">' . __('Cancel order &amp; restore cart', 'woocommerce') . '</a>' .
+		    '</form>';
         }
 
         /**
@@ -388,6 +388,8 @@ function wc_bb_payments_gateway_load()
          **/
         function check_ipn_request_is_valid($data)
         {
+            global $woocommerce;
+
             $this->log_message('Checking IPN response is valid...');
 
             // Get recieved values from post data
@@ -610,22 +612,6 @@ function wc_bb_payments_gateway_load()
         }
 
         /**
-         * Adds error message when not configured the access_token.
-         */
-        public function access_token_missing_message()
-        {
-            $this->app_missing_message('Access Token');
-        }
-
-        /**
-         * Adds error message when not configured the app_secret.
-         */
-        public function app_secret_missing_message()
-        {
-            $this->app_missing_message('Application Secret');
-        }
-
-        /**
          * Adds error message when not configured the app_secret.
          */
         public function app_url_missing_message()
@@ -636,7 +622,7 @@ function wc_bb_payments_gateway_load()
         /**
          * Adds message to log (if permitted)
          */
-//	public function log_message($message) { if ($this->debug == 'yes') $this->log->add('BB Payments', $message); }
+        //	public function log_message($message) { if ($this->debug == 'yes') $this->log->add('BB Payments', $message); }
         public function log_message($message)
         {
             $this->log->add('BB Payments', $message);
