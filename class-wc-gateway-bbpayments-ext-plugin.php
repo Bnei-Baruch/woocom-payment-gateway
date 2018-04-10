@@ -184,7 +184,7 @@ function wc_bb_payments_gateway_load()
                     'type' => 'text',
                     'label' => __('like 66b- for 66books.co.il', 'woocommerce'),
                     'description' => __('This prefix will be used as a part of order reference in payment gateway and in invoice provider', 'woocommerce'),
-                    'default' => 'no'),
+                    'default' => 'ext-'),
                 'testmode' => array(
                     'title' => __('Test Mode', 'woocommerce'),
                     'type' => 'checkbox',
