@@ -82,7 +82,7 @@ function wc_bb_payments_gateway_load()
             $this->testmode = $this->get_option('testmode');
             $this->prefix = $this->get_option('prefix');
             $this->debug = true; //$this->get_option('debug');
-            $this->form_submission_method = $this->get_option('form_submission_method') == 'yes' ? true : false;
+//            $this->form_submission_method = $this->get_option('form_submission_method') == 'yes' ? true : false;
             $this->notify_url = str_replace('https:', 'http:', add_query_arg('wc-api', 'WC_Gateway_BB_Payments', home_url('/')));
 
             // Validate required parameters
@@ -173,12 +173,12 @@ function wc_bb_payments_gateway_load()
                     'type' => 'text',
                     'description' => __('Please enter your BB Payments Server URL.', 'wcbb_payments'),
                     'default' => 'https://checkout.kabbalah.info/en/projects/bb_books/external_client'),
-                'form_submission_method' => array(
-                    'title' => __('Submission method', 'woocommerce'),
-                    'type' => 'checkbox',
-                    'label' => __('Use form submission method.', 'woocommerce'),
-                    'description' => __('Enable this to post order data to BB Payments via a form instead of using a redirect/querystring.', 'woocommerce'),
-                    'default' => 'no'),
+//                'form_submission_method' => array(
+//                    'title' => __('Submission method', 'woocommerce'),
+//                    'type' => 'checkbox',
+//                    'label' => __('Use form submission method.', 'woocommerce'),
+//                    'description' => __('Enable this to post order data to BB Payments via a form instead of using a redirect/querystring.', 'woocommerce'),
+//                    'default' => 'no'),
                 'prefix' => array(
                     'title' => __('Prefix for order reference', 'woocommerce'),
                     'type' => 'text',
@@ -339,7 +339,7 @@ function wc_bb_payments_gateway_load()
         {
             $order = new WC_Order($order_id);
 
-            if (!$this->form_submission_method) {
+//            if (!$this->form_submission_method) {
                 $args = $this->get_payment_args($order);
                 if ($this->testmode == 'yes') $args['test_mode'] = '1';
                 $args = http_build_query($args, '', '&');
@@ -348,14 +348,14 @@ function wc_bb_payments_gateway_load()
                 $this->log_message('Processing payment via GET...' . $addr . '?' . $args);
 
                 return array('result' => 'success', 'redirect' => $addr . '?' . $args);
-            } else {
-                $this->log_message('Processing payment via POST...');
-
-                return array(
-                    'result' => 'success',
-                    'redirect' => add_query_arg('order', $order->id, add_query_arg('key', $order->order_key, get_permalink(woocommerce_get_page_id('pay'))))
-                );
-            }
+//            } else {
+//                $this->log_message('Processing payment via POST...');
+//
+//                return array(
+//                    'result' => 'success',
+//                    'redirect' => add_query_arg('order', $order->id, add_query_arg('key', $order->order_key, get_permalink(woocommerce_get_page_id('pay'))))
+//                );
+//            }
         }
 
         /**
