@@ -69,8 +69,6 @@ function wc_bb_payments_gateway_load()
             $this->id = 'bb_payments';
             $this->icon = plugins_url('images/bb_payments.png', __FILE__);
             $this->has_fields = false;
-            $this->method_title = __('BB Payments', 'woocommerce');
-            $this->method_description = __('BB Payments', 'woocommerce');
 
             // Load the settings.
             $this->init_form_fields();
@@ -81,10 +79,8 @@ function wc_bb_payments_gateway_load()
             $this->liveurl = $this->get_option('liveurl');
             $this->confirm_url = $this->get_option('confirm_url');
             // Optional:
-            $this->title = $this->get_option('title');
-            $this->description = $this->get_option('description');
             $this->testmode = $this->get_option('testmode');
-            $this->sku = $this->get_option('sku');
+            $this->prefix = $this->get_option('prefix');
             $this->debug = true; //$this->get_option('debug');
             $this->form_submission_method = $this->get_option('form_submission_method') == 'yes' ? true : false;
             $this->notify_url = str_replace('https:', 'http:', add_query_arg('wc-api', 'WC_Gateway_BB_Payments', home_url('/')));
@@ -167,18 +163,6 @@ function wc_bb_payments_gateway_load()
                     'type' => 'checkbox',
                     'label' => __('Enable BB Payments', 'woocommerce'),
                     'default' => 'yes'),
-                'title' => array(
-                    'title' => __('Title', 'woocommerce'),
-                    'type' => 'text',
-                    'description' => __('This controls the title which the user sees during checkout.', 'woocommerce'),
-                    'default' => __('BB Payments', 'woocommerce'),
-                    'desc_tip' => true),
-                'description' => array(
-                    'title' => __('Description', 'woocommerce'),
-                    'type' => 'textarea',
-                    'description' => __('This controls the description which the user sees during checkout.', 'woocommerce'),
-                    'default' => __('Pay via BB Payments', 'woocommerce'),
-                    'desc_tip' => true),
                 'confirm_url' => array(
                     'title' => __('Confirmation URL', 'wc_bb_payments'),
                     'type' => 'text',
@@ -195,11 +179,11 @@ function wc_bb_payments_gateway_load()
                     'label' => __('Use form submission method.', 'woocommerce'),
                     'description' => __('Enable this to post order data to BB Payments via a form instead of using a redirect/querystring.', 'woocommerce'),
                     'default' => 'no'),
-                'SKU' => array(
-                    'title' => __('Priority SKU', 'woocommerce'),
+                'prefix' => array(
+                    'title' => __('Prefix for order reference', 'woocommerce'),
                     'type' => 'text',
-                    'label' => __('stockkeeping unit.', 'woocommerce'),
-                    'description' => __('Identification for a product', 'woocommerce'),
+                    'label' => __('like 66b- for 66books.co.il', 'woocommerce'),
+                    'description' => __('This prefix will be used as a part of order reference in payment gateway and in invoice provider', 'woocommerce'),
                     'default' => 'no'),
                 'testmode' => array(
                     'title' => __('Test Mode', 'woocommerce'),
@@ -247,18 +231,18 @@ function wc_bb_payments_gateway_load()
 
                 'Name' => $order->get_formatted_billing_full_name(),
                 'Price' => number_format($order->get_total(), 2, '.', ''),
-                'Currency' => get_woocommerce_currency(), // TODO: to translate?
+                'Currency' => get_woocommerce_currency(),
                 'Email' => $order->email,
                 'Phone' => $order->phone,
                 'Street' => $order->get_formatted_billing_address(),
                 'City' => $order->city,
                 'Country' => $order->country,
                 'Participants' => 1,
-                'SKU' => $this->settings["SKU"],
+                'SKU' => $order->sku, // TODO: to make it part of order!!!
                 'VAT' => 'N',
                 'Installments' => 3,
                 'Language' => $language,
-                'Reference' => '66b-' . $order_id,
+                'Reference' => $this->settings["prefix"] . $order_id,
                 'Organization' => 'ben2',
 
                 // TODO: IPN
