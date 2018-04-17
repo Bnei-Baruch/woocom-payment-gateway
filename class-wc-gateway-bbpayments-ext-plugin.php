@@ -209,7 +209,7 @@ function wc_bb_payments_gateway_load()
          */
         function get_payment_args($order)
         {
-            $order_key = $order->order_key;
+            $order_key = $order->get_order_key();
             $order_id = $order->get_order_number();
 
             $this->log_message('Generating payment form for order ' . $order_id);
@@ -221,6 +221,7 @@ function wc_bb_payments_gateway_load()
             } else {
                 $language = 'EN';
             }
+
             $args = array(
                 'UserKey' => $order_key . "-" . $order_id,
 
@@ -231,11 +232,11 @@ function wc_bb_payments_gateway_load()
                 'Name' => $order->get_formatted_billing_full_name(),
                 'Price' => number_format($order->get_total(), 2, '.', ''),
                 'Currency' => get_woocommerce_currency(),
-                'Email' => $order->email,
-                'Phone' => $order->phone,
+                'Email' => $order->get_billing_email(),
+                'Phone' => $order->get_billing_phone(),
                 'Street' => $order->get_formatted_billing_address(),
-                'City' => $order->city,
-                'Country' => $order->country,
+                'City' => $order->get_billing_city(),
+                'Country' => $order->get_billing_country(),
                 'Participants' => 1,
                 'SKU' => $order->sku,
                 'VAT' => 'N',
@@ -258,11 +259,6 @@ function wc_bb_payments_gateway_load()
             $args['Details'] = implode(', ', $item_names);
 
             $args = apply_filters('woocommerce_bb_payments_args', $args);
-
-            // echo "<pre>";
-            // var_dump($this);
-            // echo "</pre>";
-            // exit();
 
             return $args;
         }
