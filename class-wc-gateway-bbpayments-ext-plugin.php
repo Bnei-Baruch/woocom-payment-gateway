@@ -83,7 +83,6 @@ function wc_bb_payments_gateway_load()
             $this->prefix = $this->get_option('prefix');
             $this->debug = true; //$this->get_option('debug');
 //            $this->form_submission_method = $this->get_option('form_submission_method') == 'yes' ? true : false;
-            $this->notify_url = str_replace('https:', 'http:', add_query_arg('wc-api', 'WC_Gateway_BB_Payments', home_url('/')));
 
             // Validate required parameters
             if (empty($this->liveurl)) {
@@ -213,7 +212,7 @@ function wc_bb_payments_gateway_load()
             $order_key = $order->order_key;
             $order_id = $order->get_order_number();
 
-            $this->log_message('Generating payment form for order ' . $order_id . '. Notify URL: ' . $this->notify_url);
+            $this->log_message('Generating payment form for order ' . $order_id);
 
             if (ICL_LANGUAGE_CODE == 'he') {
                 $language = 'HE';
@@ -223,7 +222,7 @@ function wc_bb_payments_gateway_load()
                 $language = 'EN';
             }
             $args = array(
-                'UserKey' => $order_key,
+                'UserKey' => $order_key . "-" . $order_id,
 
                 'GoodURL' => $this->get_return_url($order),
                 'ErrorURL' => $order->get_cancel_order_url(),
@@ -238,16 +237,12 @@ function wc_bb_payments_gateway_load()
                 'City' => $order->city,
                 'Country' => $order->country,
                 'Participants' => 1,
-                'SKU' => $order->sku, // TODO: to make it part of order!!!
+                'SKU' => $order->sku,
                 'VAT' => 'N',
                 'Installments' => 3,
                 'Language' => $language,
-                'Reference' => $this->settings["prefix"] . $order_id,
+                'Reference' => $this->settings["prefix"] . $order_key . "-" . $order_id,
                 'Organization' => 'ben2',
-
-                // TODO: IPN
-                // 'notify_url' => $this->notify_url,
-
             );
 
             $item_names = array();
@@ -340,14 +335,14 @@ function wc_bb_payments_gateway_load()
             $order = new WC_Order($order_id);
 
 //            if (!$this->form_submission_method) {
-                $args = $this->get_payment_args($order);
-                if ($this->testmode == 'yes') $args['test_mode'] = '1';
-                $args = http_build_query($args, '', '&');
-                $addr = $this->liveurl;
+            $args = $this->get_payment_args($order);
+            if ($this->testmode == 'yes') $args['test_mode'] = '1';
+            $args = http_build_query($args, '', '&');
+            $addr = $this->liveurl;
 
-                $this->log_message('Processing payment via GET...' . $addr . '?' . $args);
+            $this->log_message('Processing payment via GET...' . $addr . '?' . $args);
 
-                return array('result' => 'success', 'redirect' => $addr . '?' . $args);
+            return array('result' => 'success', 'redirect' => $addr . '?' . $args);
 //            } else {
 //                $this->log_message('Processing payment via POST...');
 //
@@ -380,48 +375,33 @@ function wc_bb_payments_gateway_load()
 
             // Get recieved values from post data
             $received_values = stripslashes_deep($data);
-            $order = new WC_Order($received_values['invoiceID']);
+            $invoiceID = $received_values['invoiceID'];
+            $order = new WC_Order($invoiceID);
             $this->log_message(print_r($order, true));
 
             // Build request
+            $order_key = $order->order_key;
+            $order_id = $order->get_order_number();
             $args = array(
-                'access_token' => $this->access_token,
-                'invoiceID' => $received_values['invoiceID'],
-                'amount' => number_format($order->get_total(), 2, '.', ''),
-                'currency' => get_woocommerce_currency()
+                'UserKey' => $order_key . "-" . $order_id,
+                'invoiceID' => $invoiceID,
+                'Price' => number_format($order->get_total(), 2, '.', ''),
+                'Currency' => get_woocommerce_currency(),
+                'SKU' => $order->sku,
+                'Reference' => $this->settings["prefix"] . $order_key . "-" . $order_id,
+                'Organization' => 'ben2',
             );
 
-            // Encode request
-            $pub_key = openssl_pkey_get_public($this->app_secret);
-            $query = '';
-            $index = 0;
-            foreach ($args as $key => $value) {
-                if ($value === NULL) continue;
-
-                $q = "{$key}={$value}";
-                if (openssl_public_encrypt($q, $encrypted, $pub_key) === FALSE) {
-                    while ($msg = openssl_error_string()) {
-                        echo "<p>$msg</p>";
-                    }
-                    return false;
-                }
-                $query .= "#q{$index}=" . base64_encode($encrypted);
-                $index++;
-            }
-            $query = substr($query, 1);
-
             // Submit request and get response
-            $data = array('data' => $query);
-            $confirm = $this->confirm_url . '/' . $received_values['payment_id'] . '/external_confirm';
             $params = array(
-                'body' => $data,
+                'body' => $args,
                 'sslverify' => false,
                 'timeout' => 60,
                 'httpversion' => '1.1',
                 'headers' => array('host' => 'checkout.kabbalah.info'),
                 'user-agent' => 'WooCommerce/' . $woocommerce->version
             );
-            $response = wp_remote_post($confirm, $params);
+            $response = wp_remote_post($this->confirm_url, $params);
 
             // check to see if the request was valid
             if (is_wp_error($response) || $response['response']['code'] != 200) {
@@ -438,13 +418,13 @@ function wc_bb_payments_gateway_load()
             $values = explode('&', $response['body']);
             foreach ($values as $p) {
                 $parts = explode('=', $p, 2);
-                openssl_public_decrypt(base64_decode($parts[1]), $params[$parts[0]], $pub_key);
+                $params[$parts[0]] = $parts[1];
             }
 
             // Check answer is SUCCESS
-            $status = ($params['status'] == 'SUCCESS' && $args['invoiceID'] == $params['invoiceID'] && $args['amount'] == $params['amount'] && $args['currency'] == $params['currency']) ? TRUE : FALSE;
+            $status = ($params['status'] == 'SUCCESS') ? TRUE : FALSE;
 
-            $this->log_message('Received ' . ($status ? '' : 'in') . 'valid encrypted response');
+            $this->log_message('Received' . ($status ? ' ' : 'in') . 'valid encrypted response');
 
             return $status;
         }
