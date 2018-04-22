@@ -222,6 +222,8 @@ function wc_bb_payments_gateway_load()
                 $language = 'EN';
             }
 
+            // How to find SKUs:
+            // https://businessbloomer.com/woocommerce-easily-get-product-info-title-sku-desc-product-object/
             $sku = '';
             $items = $order->get_items();
             foreach ($items as $item) {
@@ -233,7 +235,7 @@ function wc_bb_payments_gateway_load()
             }
 
             $args = array(
-                'UserKey' => $order_key . "-" . $order_id,
+                'UserKey' => $this->settings["prefix"] . "-" . $order_key . "-" . $order_id,
 
                 'GoodURL' => $this->get_return_url($order),
                 'ErrorURL' => $order->get_cancel_order_url(),
@@ -252,7 +254,7 @@ function wc_bb_payments_gateway_load()
                 'VAT' => 'N',
                 'Installments' => 3,
                 'Language' => $language,
-                'Reference' => $this->settings["prefix"] . $order_key . "-" . $order_id,
+                'Reference' => $this->settings["prefix"] . $order_id,
                 'Organization' => 'ben2',
             );
 
@@ -571,7 +573,7 @@ function wc_bb_payments_gateway_load()
         }
 
         /**
-         * Adds error message when something is not confugured
+         * Adds error message when something is not configured
          */
         public function app_missing_message($problem)
         {
@@ -584,7 +586,7 @@ function wc_bb_payments_gateway_load()
         }
 
         /**
-         * Adds error message when not configured the app_secret.
+         * Adds error message when live payment URL is not configured.
          */
         public function app_url_missing_message()
         {
@@ -598,15 +600,6 @@ function wc_bb_payments_gateway_load()
         public function log_message($message)
         {
             $this->log->add('BB Payments', $message);
-        }
-
-        public function hash_implode($glue, $hash)
-        {
-            $result = array();
-            foreach ($hash as $key => $value) {
-                $result[] = $key . ': ' . $value;
-            }
-            return implode($glue, $result);
         }
     }
 }
