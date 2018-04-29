@@ -235,7 +235,7 @@ function wc_bb_payments_gateway_load()
             }
 
             $args = array(
-                'UserKey' => $this->settings["prefix"] . "-" . $order_key . "-" . $order_id,
+                'UserKey' => user_key($order_id, $order_key),
 
                 'GoodURL' => $this->get_return_url($order),
                 'ErrorURL' => $order->get_cancel_order_url(),
@@ -254,7 +254,7 @@ function wc_bb_payments_gateway_load()
                 'VAT' => 'N',
                 'Installments' => 3,
                 'Language' => $language,
-                'Reference' => $this->settings["prefix"] . $order_id,
+                'Reference' => user_key($order_id, $order_key),
                 'Organization' => 'ben2',
             );
 
@@ -372,6 +372,10 @@ function wc_bb_payments_gateway_load()
             echo $this->generate_form($order);
         }
 
+        function user_key($order_id, $order_key) {
+            return $this->settings["prefix"] . "-" . $order_key . "-" . $order_id;
+        }
+
         /**
          * Check IPN validity
          **/
@@ -383,20 +387,20 @@ function wc_bb_payments_gateway_load()
 
             // Get recieved values from post data
             $received_values = stripslashes_deep($data);
-            $invoiceID = $received_values['invoiceID'];
-            $order = new WC_Order($invoiceID);
-            $this->log_message(print_r($order, true));
+            $user_key = $received_values['UserKey'];
+            $parts = explode('-', $user_key);
+            $order_id = end($parts);
+            $order = new WC_Order($order_id);
+            $this->log_message("IPN request: " . print_r($order, true));
 
             // Build request
             $order_key = $order->order_key;
-            $order_id = $order->get_order_number();
             $args = array(
-                'UserKey' => $order_key . "-" . $order_id,
-                'invoiceID' => $invoiceID,
+                'UserKey' => user_key($order_id, $order_key),
                 'Price' => number_format($order->get_total(), 2, '.', ''),
                 'Currency' => get_woocommerce_currency(),
                 'SKU' => $order->sku,
-                'Reference' => $this->settings["prefix"] . $order_key . "-" . $order_id,
+                'Reference' => user_key($order_id, $order_key),
                 'Organization' => 'ben2',
             );
 
@@ -406,15 +410,17 @@ function wc_bb_payments_gateway_load()
                 'sslverify' => false,
                 'timeout' => 60,
                 'httpversion' => '1.1',
-                'headers' => array('host' => 'checkout.kabbalah.info'),
+                // TODO: Get host name from confirm_url
+                //'headers' => array('host' => 'checkout.kabbalah.info'),
                 'user-agent' => 'WooCommerce/' . $woocommerce->version
             );
             $response = wp_remote_post($this->confirm_url, $params);
+            $this->log_message("IPN response: " . print_r($response, true));
 
             // check to see if the request was valid
             if (is_wp_error($response) || $response['response']['code'] != 200) {
                 $this->log_message('Received invalid response');
-                $this->log_message(print_r($response['body'], true));
+                $this->log_message("IPN response: " . print_r($response['body'], true));
                 if (is_wp_error($response))
                     $this->log_message('Error response: ' . $response->get_error_message());
 
