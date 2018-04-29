@@ -236,7 +236,7 @@ function wc_bb_payments_gateway_load()
 
             $args = array(
                 'UserKey' => $this->user_key($order_id, $order_key),
-		'GoodURL' => str_replace( 'https:', 'http:', add_query_arg( 'wc-api', 'WC_Gateway_BB_Payments', home_url( '/' ) ) ),
+                'GoodURL' => str_replace('https:', 'http:', add_query_arg('wc-api', 'WC_Gateway_BB_Payments', home_url('/'))),
                 'ErrorURL' => $order->get_cancel_order_url(),
                 'CancelURL' => $order->get_cancel_order_url(),
 
@@ -411,11 +411,11 @@ function wc_bb_payments_gateway_load()
 
             // Submit request and get response
             $url = $this->confirm_url . "?UserKey=" . $this->user_key($order_id, $order_key) .
-                    '&Price=' . number_format($order->get_total(), 2, '.', '') .
-                    '&Currency=' . get_woocommerce_currency() .
-                    '&SKU=' . $sku .
-                    '&Reference=' . $this->user_key($order_id, $order_key, true) .
-                    '&Organization=' . 'ben2';
+                '&Price=' . number_format($order->get_total(), 2, '.', '') .
+                '&Currency=' . get_woocommerce_currency() .
+                '&SKU=' . $sku .
+                '&Reference=' . $this->user_key($order_id, $order_key, true) .
+                '&Organization=' . 'ben2';
             // $this->log_message("IPN request: " . print_r($url, true));
             $response = wp_remote_get($url);
             // $this->log_message("IPN response: " . print_r($response, true));
@@ -490,7 +490,7 @@ function wc_bb_payments_gateway_load()
             }
             if (!isset($order->id)) {
                 $this->log_message('Not found order for payment: ' . print_r($received_values, true));
-	    }
+            }
             // Validate key
             if ($order->order_key !== $order_key) {
                 $this->log_message('Error: Order Key does not match invoice.');
@@ -507,26 +507,26 @@ function wc_bb_payments_gateway_load()
 
             // Validate Amount
             if ($order->get_total() != ($received_values['debit_total'] / 100)) {
-               $this->log_message('Payment error: Amounts do not match (' . $order->get_total() . ' vs. ' . $received_values['amount'] . ')');
+                $this->log_message('Payment error: Amounts do not match (' . $order->get_total() . ' vs. ' . $received_values['amount'] . ')');
 
-               // Put this order on-hold for manual checking
-               $order->update_status('on-hold', sprintf(__('Validation error: BB Payments amounts do not match (%s).', 'woocommerce'), $received_values['amount']));
-               exit;
+                // Put this order on-hold for manual checking
+                $order->update_status('on-hold', sprintf(__('Validation error: BB Payments amounts do not match (%s).', 'woocommerce'), $received_values['amount']));
+                exit;
             }
-	    $currency = 1;
-	    $wcurrency = get_woocommerce_currency();
-	    if ($wcurrency == "USD") {
-		    $currency = 2;
-	    } elseif ($wcurrency == "EUR") {
-		    $currency = 978;
-	    }
+            $currency = 1;
+            $wcurrency = get_woocommerce_currency();
+            if ($wcurrency == "USD") {
+                $currency = 2;
+            } elseif ($wcurrency == "EUR") {
+                $currency = 978;
+            }
             if ($currency != $received_values['debit_currency']) {
-               $this->log_message('Payment error: Currencies do not match (' . $currency . ' vs. ' . $received_values['currency'] . ')');
+                $this->log_message('Payment error: Currencies do not match (' . $currency . ' vs. ' . $received_values['currency'] . ')');
 
-               // Put this order on-hold for manual checking
-               $order->update_status('on-hold', sprintf(__('Validation error: BB Payments currencies do not match (%s).', 'woocommerce'), $received_values['currency']));
+                // Put this order on-hold for manual checking
+                $order->update_status('on-hold', sprintf(__('Validation error: BB Payments currencies do not match (%s).', 'woocommerce'), $received_values['currency']));
 
-               exit;
+                exit;
             }
 
             $order->add_order_note(__('IPN payment completed', 'woocommerce'));
