@@ -227,7 +227,7 @@ function wc_bb_payments_gateway_load()
             $sku = '';
             $items = $order->get_items();
             foreach ($items as $item) {
-                $product = wc_get_product( $item['product_id'] );
+                $product = wc_get_product($item['product_id']);
                 $sku = $product->get_sku();
                 // TODO: how to fine all SKUs and what to do with them?
                 // For now -- stop after the first one
@@ -254,7 +254,7 @@ function wc_bb_payments_gateway_load()
                 'VAT' => 'N',
                 'Installments' => 3,
                 'Language' => $language,
-                'Reference' => $this->user_key($order_id, $order_key),
+                'Reference' => $this->user_key($order_id, $order_key, true),
                 'Organization' => 'ben2',
             );
 
@@ -372,8 +372,13 @@ function wc_bb_payments_gateway_load()
             echo $this->generate_form($order);
         }
 
-        function user_key($order_id, $order_key) {
-            return $this->settings["prefix"] . "-" . $order_key . "-" . $order_id;
+        function user_key($order_id, $order_key, $short = false)
+        {
+            if ($short) {
+                return $this->settings["prefix"] . $order_id;
+            } else {
+                return $this->settings["prefix"] . "-" . $order_key . "-" . $order_id;
+            }
         }
 
         /**
@@ -400,7 +405,7 @@ function wc_bb_payments_gateway_load()
                 'Price' => number_format($order->get_total(), 2, '.', ''),
                 'Currency' => get_woocommerce_currency(),
                 'SKU' => $order->sku,
-                'Reference' => user_key($order_id, $order_key),
+                'Reference' => user_key($order_id, $order_key, true),
                 'Organization' => 'ben2',
             );
 
