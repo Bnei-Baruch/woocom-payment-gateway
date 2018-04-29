@@ -235,7 +235,7 @@ function wc_bb_payments_gateway_load()
             }
 
             $args = array(
-                'UserKey' => user_key($order_id, $order_key),
+                'UserKey' => $this->user_key($order_id, $order_key),
 
                 'GoodURL' => $this->get_return_url($order),
                 'ErrorURL' => $order->get_cancel_order_url(),
@@ -254,7 +254,7 @@ function wc_bb_payments_gateway_load()
                 'VAT' => 'N',
                 'Installments' => 3,
                 'Language' => $language,
-                'Reference' => user_key($order_id, $order_key),
+                'Reference' => $this->user_key($order_id, $order_key),
                 'Organization' => 'ben2',
             );
 
