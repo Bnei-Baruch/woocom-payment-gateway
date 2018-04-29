@@ -229,15 +229,14 @@ function wc_bb_payments_gateway_load()
             foreach ($items as $item) {
                 $product = wc_get_product($item['product_id']);
                 $sku = $product->get_sku();
-                // TODO: how to fine all SKUs and what to do with them?
+                // TODO: how to find all SKUs and what to do with them?
                 // For now -- stop after the first one
                 break;
             }
 
             $args = array(
                 'UserKey' => $this->user_key($order_id, $order_key),
-
-                'GoodURL' => $this->get_return_url($order),
+		'GoodURL' => str_replace( 'https:', 'http:', add_query_arg( 'wc-api', 'WC_Gateway_BB_Payments', home_url( '/' ) ) ),
                 'ErrorURL' => $order->get_cancel_order_url(),
                 'CancelURL' => $order->get_cancel_order_url(),
 
@@ -392,35 +391,34 @@ function wc_bb_payments_gateway_load()
 
             // Get recieved values from post data
             $received_values = stripslashes_deep($data);
-            $user_key = $received_values['UserKey'];
+            $user_key = $received_values['user_key'];
             $parts = explode('-', $user_key);
             $order_id = end($parts);
             $order = new WC_Order($order_id);
-            $this->log_message("IPN request: " . print_r($order, true));
 
             // Build request
             $order_key = $order->order_key;
-            $args = array(
-                'UserKey' => user_key($order_id, $order_key),
-                'Price' => number_format($order->get_total(), 2, '.', ''),
-                'Currency' => get_woocommerce_currency(),
-                'SKU' => $order->sku,
-                'Reference' => user_key($order_id, $order_key, true),
-                'Organization' => 'ben2',
-            );
+
+            $sku = '';
+            $items = $order->get_items();
+            foreach ($items as $item) {
+                $product = wc_get_product($item['product_id']);
+                $sku = $product->get_sku();
+                // TODO: how to find all SKUs and what to do with them?
+                // For now -- stop after the first one
+                break;
+            }
 
             // Submit request and get response
-            $params = array(
-                'body' => $args,
-                'sslverify' => false,
-                'timeout' => 60,
-                'httpversion' => '1.1',
-                // TODO: Get host name from confirm_url
-                //'headers' => array('host' => 'checkout.kabbalah.info'),
-                'user-agent' => 'WooCommerce/' . $woocommerce->version
-            );
-            $response = wp_remote_post($this->confirm_url, $params);
-            $this->log_message("IPN response: " . print_r($response, true));
+            $url = $this->confirm_url . "?UserKey=" . $this->user_key($order_id, $order_key) .
+                    '&Price=' . number_format($order->get_total(), 2, '.', '') .
+                    '&Currency=' . get_woocommerce_currency() .
+                    '&SKU=' . $sku .
+                    '&Reference=' . $this->user_key($order_id, $order_key, true) .
+                    '&Organization=' . 'ben2';
+            // $this->log_message("IPN request: " . print_r($url, true));
+            $response = wp_remote_get($url);
+            // $this->log_message("IPN response: " . print_r($response, true));
 
             // check to see if the request was valid
             if (is_wp_error($response) || $response['response']['code'] != 200) {
@@ -443,7 +441,7 @@ function wc_bb_payments_gateway_load()
             // Check answer is SUCCESS
             $status = ($params['status'] == 'SUCCESS') ? TRUE : FALSE;
 
-            $this->log_message('Received' . ($status ? ' ' : 'in') . 'valid encrypted response');
+            $this->log_message('Received' . ($status ? ' ' : ' in') . 'valid encrypted response');
 
             return $status;
         }
@@ -475,112 +473,69 @@ function wc_bb_payments_gateway_load()
          * @param array $posted
          * @return void
          */
-        function successful_request($posted)
+        function successful_request($data)
         {
-            $this->log_message('successful_request');
-            $posted = stripslashes_deep($posted);
+            $received_values = stripslashes_deep($data);
+            $this->log_message('successful_request: ' . print_r($received_values, true));
+            $user_key = $received_values['user_key'];
+            $parts = explode('-', $user_key);
 
-            // Custom holds post ID
-            if (!empty($posted['invoiceID']) && !empty($posted['custom1'])) {
-
-                $order = $this->get_bb_payments_order($posted);
-
-                $this->log_message('Found order #' . $order->id);
-
-                // Check order not already completed
-                if ($order->status == 'completed') {
-                    $this->log_message('Aborting, Order #' . $order->id . ' is already complete.');
-                    exit;
-                }
-
-                // Validate Amount
-                if ($order->get_total() != $posted['amount']) {
-                    $this->log_message('Payment error: Amounts do not match (' . $posted['amount'] . ')');
-
-                    // Put this order on-hold for manual checking
-                    $order->update_status('on-hold', sprintf(__('Validation error: BB Payments amounts do not match (%s).', 'woocommerce'), $posted['amount']));
-
-                    exit;
-                }
-                if (get_woocommerce_currency() != $posted['currency']) {
-                    $this->log_message('Payment error: Currencies do not match (' . $posted['currency'] . ')');
-
-                    // Put this order on-hold for manual checking
-                    $order->update_status('on-hold', sprintf(__('Validation error: BB Payments currencies do not match (%s).', 'woocommerce'), $posted['currency']));
-
-                    exit;
-                }
-
-                // Validate Email Address
-                if (strcasecmp(trim($posted['receiver_email']), trim($this->receiver_email)) != 0) {
-                    $this->log_message("IPN Response is for another one: {$posted['email']} our email is {$this->receiver_email}");
-
-                    // Put this order on-hold for manual checking
-                    $order->update_status('on-hold', sprintf(__('Validation error: BB Payments IPN response from a different email address (%s).', 'woocommerce'), $posted['email']));
-
-                    exit;
-                }
-
-                // Store PP Details
-                if (!empty($posted['email']))
-                    update_post_meta($order->id, 'Payer email address', $posted['email']);
-                if (!empty($posted['payment_id']))
-                    update_post_meta($order->id, 'Transaction ID', $posted['payment_id']);
-                if (!empty($posted['first_name']))
-                    update_post_meta($order->id, 'Payer first name', $posted['first_name']);
-                if (!empty($posted['last_name']))
-                    update_post_meta($order->id, 'Payer last name', $posted['last_name']);
-
-                $order->add_order_note(__('IPN payment completed', 'woocommerce'));
-                $order->payment_complete();
-
-                $this->log_message('Payment complete.');
-
-                wp_redirect($this->get_return_url($order));
-                exit;
-            } else {
-                $this->log_message('Not found order for payment: ' . print_r($posted, true));
-            }
-        }
-
-        /**
-         * get_bb_payments_order function.
-         *
-         * @access public
-         * @param mixed $posted
-         * @return void
-         */
-        function get_bb_payments_order($posted)
-        {
-            $this->log_message('get_bb_payments_order');
-            $custom = maybe_unserialize($posted['custom1']);
-
-            // Backwards comp for IPN requests
-            if (is_numeric($custom)) {
-                $order_id = (int)$custom;
-                $order_key = $posted['invoice'];
-            } elseif (is_string($custom)) {
-                $order_id = (int)str_replace($this->invoice_prefix, '', $custom);
-                $order_key = $custom;
-            } else {
-                list($order_id, $order_key) = $custom;
-            }
-
+            $order_id = end($parts);
+            $order_key = prev($parts);
             $order = new WC_Order($order_id);
-
             if (!isset($order->id)) {
                 // We have an invalid $order_id, probably because invoice_prefix has changed
                 $order_id = woocommerce_get_order_id_by_order_key($order_key);
                 $order = new WC_Order($order_id);
             }
-
+            if (!isset($order->id)) {
+                $this->log_message('Not found order for payment: ' . print_r($received_values, true));
+	    }
             // Validate key
             if ($order->order_key !== $order_key) {
                 $this->log_message('Error: Order Key does not match invoice.');
                 exit;
             }
 
-            return $order;
+            $this->log_message('Found order #' . $order->id);
+
+            // Check order not already completed
+            if ($order->status == 'completed') {
+                $this->log_message('Aborting, Order #' . $order->id . ' is already complete.');
+                exit;
+            }
+
+            // Validate Amount
+            if ($order->get_total() != ($received_values['debit_total'] / 100)) {
+               $this->log_message('Payment error: Amounts do not match (' . $order->get_total() . ' vs. ' . $received_values['amount'] . ')');
+
+               // Put this order on-hold for manual checking
+               $order->update_status('on-hold', sprintf(__('Validation error: BB Payments amounts do not match (%s).', 'woocommerce'), $received_values['amount']));
+               exit;
+            }
+	    $currency = 1;
+	    $wcurrency = get_woocommerce_currency();
+	    if ($wcurrency == "USD") {
+		    $currency = 2;
+	    } elseif ($wcurrency == "EUR") {
+		    $currency = 978;
+	    }
+            if ($currency != $received_values['debit_currency']) {
+               $this->log_message('Payment error: Currencies do not match (' . $currency . ' vs. ' . $received_values['currency'] . ')');
+
+               // Put this order on-hold for manual checking
+               $order->update_status('on-hold', sprintf(__('Validation error: BB Payments currencies do not match (%s).', 'woocommerce'), $received_values['currency']));
+
+               exit;
+            }
+
+            $order->add_order_note(__('IPN payment completed', 'woocommerce'));
+            $order->payment_complete();
+
+            $this->log_message('Payment complete.');
+
+            wp_redirect($this->get_return_url($order));
+            exit;
         }
 
         /**
