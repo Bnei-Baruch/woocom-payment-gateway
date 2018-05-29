@@ -78,11 +78,11 @@ function wc_bb_payments_gateway_load()
             // Required:
             $this->liveurl = $this->get_option('liveurl');
             $this->confirm_url = $this->get_option('confirm_url');
+            $this->genericSKU = $this->get_option('genericSKU');
             // Optional:
             $this->testmode = $this->get_option('testmode');
             $this->prefix = $this->get_option('prefix');
             $this->debug = true; //$this->get_option('debug');
-//            $this->form_submission_method = $this->get_option('form_submission_method') == 'yes' ? true : false;
 
             // Validate required parameters
             if (empty($this->liveurl)) {
@@ -172,12 +172,12 @@ function wc_bb_payments_gateway_load()
                     'type' => 'text',
                     'description' => __('Please enter your BB Payments Server URL.', 'wcbb_payments'),
                     'default' => 'https://checkout.kabbalah.info/en/projects/bb_books/external_client'),
-//                'form_submission_method' => array(
-//                    'title' => __('Submission method', 'woocommerce'),
-//                    'type' => 'checkbox',
-//                    'label' => __('Use form submission method.', 'woocommerce'),
-//                    'description' => __('Enable this to post order data to BB Payments via a form instead of using a redirect/querystring.', 'woocommerce'),
-//                    'default' => 'no'),
+                'genericSKU' => array(
+                    'title' => __('Generic SKU', 'woocommerce'),
+                    'type' => 'checkbox',
+                    'label' => __('Generic SKU.', 'woocommerce'),
+                    'description' => __('This SKU will be used for every payment without SKU.', 'woocommerce'),
+                    'default' => ''),
                 'prefix' => array(
                     'title' => __('Prefix for order reference', 'woocommerce'),
                     'type' => 'text',
@@ -230,8 +230,14 @@ function wc_bb_payments_gateway_load()
                 $product = wc_get_product($item['product_id']);
                 $sku = $product->get_sku();
                 // TODO: how to find all SKUs and what to do with them?
-                // For now -- stop after the first one
-                break;
+                // For now -- stop after the first found one
+                if ($sku != '') {
+                    break;
+                }
+            }
+
+            if ($sku == '') {
+                $sku = $this->genericSKU;
             }
 
             $args = array(
@@ -255,6 +261,7 @@ function wc_bb_payments_gateway_load()
                 'Language' => $language,
                 'Reference' => $this->user_key($order_id, $order_key, true),
                 'Organization' => 'ben2',
+                'IsVisual' => true,
             );
 
             $item_names = array();
@@ -418,7 +425,7 @@ function wc_bb_payments_gateway_load()
                 '&Organization=' . 'ben2';
             // $this->log_message("IPN request: " . print_r($url, true));
             $response = wp_remote_get($url);
-            // $this->log_message("IPN response: " . print_r($response, true));
+            $this->log_message("IPN response: " . print_r($response, true));
 
             // check to see if the request was valid
             if (is_wp_error($response) || $response['response']['code'] != 200) {
@@ -441,7 +448,7 @@ function wc_bb_payments_gateway_load()
             // Check answer is SUCCESS
             $status = ($params['status'] == 'SUCCESS') ? TRUE : FALSE;
 
-            $this->log_message('Received' . ($status ? ' ' : ' in') . 'valid encrypted response');
+            $this->log_message('Received' . ($status ? ' ' : ' in') . 'valid response');
 
             return $status;
         }
