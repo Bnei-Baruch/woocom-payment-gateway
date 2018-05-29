@@ -200,6 +200,28 @@ function wc_bb_payments_gateway_load()
             );
         }
 
+        function find_sku($order) {
+            // How to find SKUs:
+            // https://businessbloomer.com/woocommerce-easily-get-product-info-title-sku-desc-product-object/
+            $sku = '';
+            $items = $order->get_items();
+            foreach ($items as $item) {
+                $product = wc_get_product($item['product_id']);
+                $sku = $product->get_sku();
+                // TODO: how to find all SKUs and what to do with them?
+                // For now -- stop after the first found one
+                if ($sku != '') {
+                    break;
+                }
+            }
+
+            if ($sku == '') {
+                $sku = $this->genericSKU;
+            }
+
+            return $sku;
+        }
+
         /**
          * Get Args for passing to BB Payments
          *
@@ -222,23 +244,7 @@ function wc_bb_payments_gateway_load()
                 $language = 'EN';
             }
 
-            // How to find SKUs:
-            // https://businessbloomer.com/woocommerce-easily-get-product-info-title-sku-desc-product-object/
-            $sku = '';
-            $items = $order->get_items();
-            foreach ($items as $item) {
-                $product = wc_get_product($item['product_id']);
-                $sku = $product->get_sku();
-                // TODO: how to find all SKUs and what to do with them?
-                // For now -- stop after the first found one
-                if ($sku != '') {
-                    break;
-                }
-            }
-
-            if ($sku == '') {
-                $sku = $this->genericSKU;
-            }
+            $sku = $this->find_sku($order);
 
             $args = array(
                 'UserKey' => $this->user_key($order_id, $order_key),
@@ -406,15 +412,7 @@ function wc_bb_payments_gateway_load()
             // Build request
             $order_key = $order->order_key;
 
-            $sku = '';
-            $items = $order->get_items();
-            foreach ($items as $item) {
-                $product = wc_get_product($item['product_id']);
-                $sku = $product->get_sku();
-                // TODO: how to find all SKUs and what to do with them?
-                // For now -- stop after the first one
-                break;
-            }
+            $sku = $this->find_sku($order);
 
             // Submit request and get response
             $url = $this->confirm_url . "?UserKey=" . $this->user_key($order_id, $order_key) .
