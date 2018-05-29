@@ -174,7 +174,7 @@ function wc_bb_payments_gateway_load()
                     'default' => 'https://checkout.kabbalah.info/en/projects/bb_books/external_client'),
                 'genericSKU' => array(
                     'title' => __('Generic SKU', 'woocommerce'),
-                    'type' => 'checkbox',
+                    'type' => 'text',
                     'label' => __('Generic SKU.', 'woocommerce'),
                     'description' => __('This SKU will be used for every payment without SKU.', 'woocommerce'),
                     'default' => ''),
