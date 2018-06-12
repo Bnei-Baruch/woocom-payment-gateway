@@ -3,7 +3,17 @@
 Plugin Name: BB Payments System Gateway
 Description: Provides a BB Payments System Gateway
 Author: BB
-Version: 0.1.0
+Version: 0.1.5
+*/
+
+/* DEBUG
+echo "<pre>";
+echo "UserKey: ", print_r($user_key, true);
+echo "OrderId: ", print_r($order_id, true);
+echo "URL: ", print_r($url, true);
+echo "IPN response: " . print_r($response, true);
+echo "</pre>";
+exit();
 */
 
 // Exit if accessed directly
