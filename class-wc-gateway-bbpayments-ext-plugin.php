@@ -267,7 +267,7 @@ function wc_bb_payments_gateway_load()
                 'Currency' => get_woocommerce_currency(),
                 'Email' => $order->billing_email,
                 'Phone' => $order->billing_phone,
-                'Street' => $order->get_formatted_billing_address(),
+                'Street' => $order->billing_address_1 . ' ' . $order->billing_houseno, // TODO: $order->get_formatted_billing_address(),
                 'City' => $order->billing_city,
                 'Country' => $order->billing_country,
                 'Participants' => 1,
