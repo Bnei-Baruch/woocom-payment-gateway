@@ -277,7 +277,7 @@ function wc_bb_payments_gateway_load()
                 'Language' => $language,
                 'Reference' => $this->user_key($order_id, $order_key, true),
                 'Organization' => 'ben2',
-                'IsVisual' => true,
+                'IsVisual' => false,
             );
 
             $item_names = array();
