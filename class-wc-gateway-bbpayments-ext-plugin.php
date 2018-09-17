@@ -273,7 +273,7 @@ function wc_bb_payments_gateway_load()
                 'Participants' => 1,
                 'SKU' => $sku,
                 'VAT' => 'N',
-                'Installments' => 3,
+                'Installments' => 1,
                 'Language' => $language,
                 'Reference' => $this->user_key($order_id, $order_key, true),
                 'Organization' => 'ben2',
