@@ -90,6 +90,8 @@ function wc_bb_payments_gateway_load()
             $this->confirm_url = $this->get_option('confirm_url');
             $this->genericSKU = $this->get_option('genericSKU');
             // Optional:
+            $this->title = $this->get_option('title');
+            $this->description = $this->get_option('description');
             $this->testmode = $this->get_option('testmode');
             $this->prefix = $this->get_option('prefix');
             $this->debug = true; //$this->get_option('debug');
@@ -172,6 +174,18 @@ function wc_bb_payments_gateway_load()
                     'type' => 'checkbox',
                     'label' => __('Enable BB Payments', 'woocommerce'),
                     'default' => 'yes'),
+                'title' => array(
+                    'title' => __('Title', 'woocommerce'),
+                    'type' => 'text',
+                    'description' => __('This controls the title which the user sees during checkout.', 'woocommerce'),
+                    'default' => __('BB Payments', 'woocommerce'),
+                    'desc_tip' => true),
+                'description' => array(
+                    'title' => __('Description', 'woocommerce'),
+                    'type' => 'textarea',
+                    'description' => __('This controls the description which the user sees during checkout.', 'woocommerce'),
+                    'default' => __('Pay via BB Payments', 'woocommerce'),
+                    'desc_tip' => true),
                 'confirm_url' => array(
                     'title' => __('Confirmation URL', 'wc_bb_payments'),
                     'type' => 'text',
