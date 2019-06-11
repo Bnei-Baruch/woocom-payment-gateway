@@ -105,7 +105,7 @@ function wc_bb_payments_gateway_load()
             }
 
             // Logs
-            if ('yes' == $this->debug)
+            if ($this->debug)
                 $this->log = new WC_Logger();
 
             // Payment listener/API hook
@@ -118,6 +118,9 @@ function wc_bb_payments_gateway_load()
             add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
 
             $this->enabled = (('yes' == $this->get_option('enabled')) && $this->is_valid_for_use()) ? 'yes' : 'no';
+
+            // PayPal Valid IPN hook
+            add_action('valid-paypal-standard-ipn-request', array($this, 'wc_bb_valid_paypal_ipn_request'));
         }
 
         /**
@@ -219,8 +222,7 @@ function wc_bb_payments_gateway_load()
                     'type' => 'checkbox',
                     'label' => __('Enable logging', 'woocommerce'),
                     'default' => 'no',
-                    'description' => sprintf(__('Log BB Payments events, such as IPN requests, inside <code>woocommerce/logs/bb_payments-%s.txt</code>', 'woocommerce'),
-                        sanitize_file_name(wp_hash('bb_payments'))))
+                    'description' => sprintf(__('Log BB Payments events, such as IPN requests, inside <code>woocommerce/logs/bb_payments-%s.txt</code>', 'woocommerce'), sanitize_file_name(wp_hash('bb_payments'))))
             );
         }
 
@@ -378,7 +380,6 @@ function wc_bb_payments_gateway_load()
         {
             $order = new WC_Order($order_id);
 
-//            if (!$this->form_submission_method) {
             $args = $this->get_payment_args($order);
             if ($this->testmode == 'yes') $args['test_mode'] = '1';
             $args = http_build_query($args, '', '&');
@@ -387,14 +388,98 @@ function wc_bb_payments_gateway_load()
             $this->log_message('Processing payment via GET...' . $addr . '?' . $args);
 
             return array('result' => 'success', 'redirect' => $addr . '?' . $args);
-//            } else {
-//                $this->log_message('Processing payment via POST...');
-//
-//                return array(
-//                    'result' => 'success',
-//                    'redirect' => add_query_arg('order', $order->id, add_query_arg('key', $order->order_key, get_permalink(woocommerce_get_page_id('pay'))))
-//                );
-//            }
+        }
+
+        public function wc_bb_valid_paypal_ipn_request($posted)
+        {
+            $this->log_message("wc_bb_valid_paypal_ipn_request: " . print_r($posted, true));
+            if (ICL_LANGUAGE_CODE == 'he') {
+                $language = 'HE';
+            } else if (ICL_LANGUAGE_CODE == 'ru') {
+                $language = 'RU';
+            } else {
+                $language = 'EN';
+            }
+
+            $order = ! empty( $posted['custom'] ) ? $this->get_paypal_order( $posted['custom'] ) : false;
+            if ($order) {
+                $item_names = array();
+                $items = $order->get_items();
+                if (sizeof($items) > 0) {
+                    foreach ($items as $item) {
+                        if ($item['qty']) {
+                            $item_names[] = '"' . $item['name'] . '" x ' . $item['qty'];
+                        }
+                    }
+                }
+
+                $details = implode(', ', $item_names);
+
+                $confirm_url = str_replace('payments', 'paypal', $this->confirm_url);
+                $custom = json_decode($posted['custom']);
+                $order_id = $custom->order_id;
+                $order_key = $custom->order_key;
+
+                $url = $confirm_url .
+                    // request
+                    '?Name=' . $order->get_formatted_billing_full_name() .
+                    '&Price=' . number_format($order->get_total(), 2, '.', '') .
+                    '&Currency=' . get_woocommerce_currency() . // posted['mc_currency']
+                    '&Email=' . $order->billing_email .
+                    '&Phone=' . $order->billing_phone .
+                    '&Street=' . $order->billing_address_1 . ' ' . $order->billing_houseno .
+                    '&City=' . $order->billing_city .
+                    '&Country=' . $order->billing_country .
+                    '&Details=' . $details .
+                    '&SKU=' . $this->find_sku($order) .
+                    '&Language=' . $language .
+                    '&Reference=' . $this->user_key($order_id, $order_key, true) .
+                    '&Organization=' . 'ben2' .
+                    // response
+                    '&TransactionId=' . $posted['txn_id'] .
+                    '&PaymentDate=' . $ $posted['payment_date'].
+                    '&VoucherId=' . $posted['receiver_id'] .
+                    '&Invoice=' . $posted['invoice'];
+                $this->log_message("wc_bb_valid_paypal_ipn_request URL: " . print_r($url, true));
+                $response = wp_remote_get($url);
+                $this->log_message("wc_bb_valid_paypal_ipn_request RESPONSE: " . print_r($response, true));
+            } else {
+                $this->log_message('### SEND MESSAGE HERE!!!');
+            }
+        }
+
+        /**
+         * Get the order from the PayPal 'Custom' variable.
+         *
+         * @param  string $raw_custom JSON Data passed back by PayPal.
+         * @return bool|WC_Order object
+         */
+        protected function get_paypal_order( $raw_custom ) {
+            // We have the data in the correct format, so get the order.
+            $custom = json_decode( $raw_custom );
+            if ( $custom && is_object( $custom ) ) {
+                $order_id  = $custom->order_id;
+                $order_key = $custom->order_key;
+            } else {
+                // Nothing was found.
+                $this->log_message('Order ID and key were not found in "custom".');
+                return false;
+            }
+
+            $order = wc_get_order( $order_id );
+
+            if ( ! $order ) {
+                // We have an invalid $order_id, probably because invoice_prefix has changed.
+                $order_id = wc_get_order_id_by_order_key( $order_key );
+                $order    = wc_get_order( $order_id );
+            }
+
+            if ( ! $order || $order->get_order_key() !== $order_key ) {
+                $this->log_message('Order Keys do not match.');
+                return false;
+            }
+
+            return $order;
         }
 
         /**
@@ -445,7 +530,6 @@ function wc_bb_payments_gateway_load()
                 '&SKU=' . $sku .
                 '&Reference=' . $this->user_key($order_id, $order_key, true) .
                 '&Organization=' . 'ben2';
-            // $this->log_message("IPN request: " . print_r($url, true));
             $response = wp_remote_get($url);
             $this->log_message("IPN response: " . print_r($response, true));
 
