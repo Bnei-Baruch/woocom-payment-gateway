@@ -631,13 +631,13 @@ function wc_bb_payments_gateway_load()
             if ($wcurrency == "USD") {
                 $currency = 2;
             } elseif ($wcurrency == "EUR") {
-                $currency = 978;
+                $currency = 0;
             }
             if ($currency != $received_values['debit_currency']) {
-                $this->log_message('Payment error: Currencies do not match (' . $currency . ' vs. ' . $received_values['currency'] . ')');
+                $this->log_message('Payment error: Currencies do not match (' . $currency . ' vs. ' . $received_values['debit_currency'] . ')');
 
                 // Put this order on-hold for manual checking
-                $order->update_status('on-hold', sprintf(__('Validation error: BB Payments currencies do not match (%s).', 'woocommerce'), $received_values['currency']));
+                $order->update_status('on-hold', sprintf(__('Validation error: BB Payments currencies do not match (%s).', 'woocommerce'), $received_values['debit_currency']));
 
                 exit;
             }
