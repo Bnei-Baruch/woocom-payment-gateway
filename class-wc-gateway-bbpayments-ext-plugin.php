@@ -424,7 +424,7 @@ function wc_bb_payments_gateway_load()
                     // request
                     '?Name=' . $order->get_formatted_billing_full_name() .
                     '&Price=' . number_format($order->get_total(), 2, '.', '') .
-                    '&Currency=' . get_woocommerce_currency() . // posted['mc_currency']
+                    '&Currency=' . $posted['mc_currency'] .
                     '&Email=' . $order->billing_email .
                     '&Phone=' . $order->billing_phone .
                     '&Street=' . $order->billing_address_1 . ' ' . $order->billing_houseno .
