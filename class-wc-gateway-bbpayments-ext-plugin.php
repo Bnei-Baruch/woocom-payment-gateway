@@ -44,7 +44,7 @@ function wc_bb_payments_gateway_load()
      * Add the gateway to WooCommerce.
      *
      * @access public
-     * @param  array $methods
+     * @param array $methods
      * @return array
      */
     add_filter('woocommerce_payment_gateways', 'wc_bb_payments_add_gateway');
@@ -89,6 +89,10 @@ function wc_bb_payments_gateway_load()
             $this->liveurl = $this->get_option('liveurl');
             $this->confirm_url = $this->get_option('confirm_url');
             $this->genericSKU = $this->get_option('genericSKU');
+            $this->organization = $this->get_option('organization');
+            if ($this->organization == "") {
+                $this->organization = "ben2";
+            }
             // Optional:
             $this->title = $this->get_option('title');
             $this->description = $this->get_option('description');
@@ -121,6 +125,21 @@ function wc_bb_payments_gateway_load()
 
             // PayPal Valid IPN hook
             add_action('valid-paypal-standard-ipn-request', array($this, 'wc_bb_valid_paypal_ipn_request'));
+
+            add_action('woocommerce_cancelled_order', array($this, 'wc_bb_cancelled_request'));
+        }
+
+        public function wc_bb_cancelled_request($order_id)
+        {
+            $order = wc_get_order($order_id);
+            $received_values = stripslashes_deep($_GET);
+            if ($received_values['error']) {
+                $message = $received_values['error'];
+                $order->add_order_note("Error: " . $message);
+                $redirect_url = $order->get_cancel_order_url();
+                wp_redirect($redirect_url);
+                exit;
+            }
         }
 
         /**
@@ -205,6 +224,12 @@ function wc_bb_payments_gateway_load()
                     'label' => __('Generic SKU.', 'woocommerce'),
                     'description' => __('This SKU will be used for every payment without SKU.', 'woocommerce'),
                     'default' => ''),
+                'organization' => array(
+                    'title' => __('Organization', 'woocommerce'),
+                    'type' => 'text',
+                    'label' => __('Organization', 'woocommerce'),
+                    'description' => __('Options: ben2, meshp18', 'woocommerce'),
+                    'default' => 'ben2'),
                 'prefix' => array(
                     'title' => __('Prefix for order reference', 'woocommerce'),
                     'type' => 'text',
@@ -226,7 +251,8 @@ function wc_bb_payments_gateway_load()
             );
         }
 
-        function find_sku($order) {
+        function find_sku($order)
+        {
             // How to find SKUs:
             // https://businessbloomer.com/woocommerce-easily-get-product-info-title-sku-desc-product-object/
             $sku = '';
@@ -262,10 +288,22 @@ function wc_bb_payments_gateway_load()
 
             $this->log_message('Generating payment form for order ' . $order_id);
 
-            if (ICL_LANGUAGE_CODE == 'he') {
+            $locale = get_locale();
+            if (ICL_LANGUAGE_CODE == 'he' || $locale == 'he_IL') {
                 $language = 'HE';
-            } else if (ICL_LANGUAGE_CODE == 'ru') {
+            } else if (ICL_LANGUAGE_CODE == 'ru' || $locale == 'ru_RU') {
                 $language = 'RU';
+            } else if (ICL_LANGUAGE_CODE == 'es'
+                || $locale == 'es_AR'
+                || $locale == 'es_CL'
+                || $locale == 'es_CO'
+                || $locale == 'es_MX'
+                || $locale == 'es_PE'
+                || $locale == 'es_PR'
+                || $locale == 'es_ES'
+                || $locale == 'es_VE'
+            ) {
+                $language = 'ES';
             } else {
                 $language = 'EN';
             }
@@ -292,7 +330,7 @@ function wc_bb_payments_gateway_load()
                 'Installments' => 1,
                 'Language' => $language,
                 'Reference' => $this->user_key($order_id, $order_key, true),
-                'Organization' => 'ben2',
+                'Organization' => $this->organization,
                 'IsVisual' => false,
             );
 
@@ -393,15 +431,16 @@ function wc_bb_payments_gateway_load()
         public function wc_bb_valid_paypal_ipn_request($posted)
         {
             $this->log_message("wc_bb_valid_paypal_ipn_request: " . print_r($posted, true));
-            if (ICL_LANGUAGE_CODE == 'he') {
+            $locale = get_locale();
+            if (ICL_LANGUAGE_CODE == 'he' || $locale == 'he_IL') {
                 $language = 'HE';
-            } else if (ICL_LANGUAGE_CODE == 'ru') {
+            } else if (ICL_LANGUAGE_CODE == 'ru' || $locale == 'ru_RU') {
                 $language = 'RU';
             } else {
                 $language = 'EN';
             }
 
-            $order = ! empty( $posted['custom'] ) ? $this->get_paypal_order( $posted['custom'] ) : false;
+            $order = !empty($posted['custom']) ? $this->get_paypal_order($posted['custom']) : false;
             if ($order) {
                 $item_names = array();
                 $items = $order->get_items();
@@ -434,10 +473,10 @@ function wc_bb_payments_gateway_load()
                     '&SKU=' . $this->find_sku($order) .
                     '&Language=' . $language .
                     '&Reference=' . $this->user_key($order_id, $order_key, true) .
-                    '&Organization=' . 'ben2' .
+                    '&Organization=' . $this->organization .
                     // response
                     '&TransactionId=' . $posted['txn_id'] .
-                    '&PaymentDate=' . $ $posted['payment_date'].
+                    '&PaymentDate=' . $posted['payment_date'] .
                     '&VoucherId=' . $posted['receiver_id'] .
                     '&Invoice=' . $posted['invoice'];
                 $this->log_message("wc_bb_valid_paypal_ipn_request URL: " . print_r($url, true));
@@ -451,14 +490,15 @@ function wc_bb_payments_gateway_load()
         /**
          * Get the order from the PayPal 'Custom' variable.
          *
-         * @param  string $raw_custom JSON Data passed back by PayPal.
+         * @param string $raw_custom JSON Data passed back by PayPal.
          * @return bool|WC_Order object
          */
-        protected function get_paypal_order( $raw_custom ) {
+        protected function get_paypal_order($raw_custom)
+        {
             // We have the data in the correct format, so get the order.
-            $custom = json_decode( $raw_custom );
-            if ( $custom && is_object( $custom ) ) {
-                $order_id  = $custom->order_id;
+            $custom = json_decode($raw_custom);
+            if ($custom && is_object($custom)) {
+                $order_id = $custom->order_id;
                 $order_key = $custom->order_key;
             } else {
                 // Nothing was found.
@@ -466,15 +506,15 @@ function wc_bb_payments_gateway_load()
                 return false;
             }
 
-            $order = wc_get_order( $order_id );
+            $order = wc_get_order($order_id);
 
-            if ( ! $order ) {
+            if (!$order) {
                 // We have an invalid $order_id, probably because invoice_prefix has changed.
-                $order_id = wc_get_order_id_by_order_key( $order_key );
-                $order    = wc_get_order( $order_id );
+                $order_id = wc_get_order_id_by_order_key($order_key);
+                $order = wc_get_order($order_id);
             }
 
-            if ( ! $order || $order->get_order_key() !== $order_key ) {
+            if (!$order || $order->get_order_key() !== $order_key) {
                 $this->log_message('Order Keys do not match.');
                 return false;
             }
@@ -529,7 +569,7 @@ function wc_bb_payments_gateway_load()
                 '&Currency=' . get_woocommerce_currency() .
                 '&SKU=' . $sku .
                 '&Reference=' . $this->user_key($order_id, $order_key, true) .
-                '&Organization=' . 'ben2';
+                '&Organization=' . $this->organization;
             $response = wp_remote_get($url);
             $this->log_message("IPN response: " . print_r($response, true));
 
@@ -540,7 +580,9 @@ function wc_bb_payments_gateway_load()
                 if (is_wp_error($response))
                     $this->log_message('Error response: ' . $response->get_error_message());
 
-                return false;
+                $message = 'Received invalid response<br/>\n';
+                $message = $message + 'Error response: ' . $response->get_error_message() + '<br/>\n';
+                return array(false, $message);
             }
 
             // Decode and check response
@@ -556,7 +598,7 @@ function wc_bb_payments_gateway_load()
 
             $this->log_message('Received' . ($status ? ' ' : ' in') . 'valid response');
 
-            return $status;
+            return array($status, 'Received' . ($status ? ' ' : ' in') . 'valid response');
         }
 
         /**
@@ -570,12 +612,12 @@ function wc_bb_payments_gateway_load()
             @ob_clean();
 
             $this->log_message('Received response from BB Payments');
-
-            if ($this->check_ipn_request_is_valid($_GET)) {
+            $resp = $this->check_ipn_request_is_valid($_GET);
+            if ($resp[0]) {
                 header('HTTP/1.1 200 OK');
                 do_action("valid_bb_payments_ipn_request", $_GET);
             } else {
-                wp_die("BB Payment IPN Request Failure");
+                wp_die("BB Payment Request Failure: " . $resp[1]);
             }
         }
 
